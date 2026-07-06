@@ -69,7 +69,7 @@ export function generateRecommendation(
     accuracy < 0.75 || (accuracy < 1 && totalHints > 0);
   const possibleSelfEfficacyConcern =
     lowConfidenceCount > 0 ||
-    response.overallConfidence <= 2 ||
+    (response.overallConfidence ?? 4) <= 2 ||
     response.perceivedDifficulty >= 3;
 
   if (possibleTaskUnderstandingConcern) {

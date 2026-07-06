@@ -266,6 +266,14 @@ export function FacilitatorDashboard() {
                       <p className="mt-2 leading-7 text-slate-700">
                         {result.recommendation.action}
                       </p>
+                      {result.response.reflectionComment ? (
+                        <div className="mt-4 rounded-md bg-white p-3 text-sm leading-6 text-slate-700">
+                          <p className="font-semibold text-slate-900">
+                            Learner reflection
+                          </p>
+                          <p>{result.response.reflectionComment}</p>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 

@@ -1,6 +1,7 @@
 export const literacyActivity = {
   id: "literacy-main-idea-1",
   title: "Finding the main idea",
+  storyTitle: "The Classroom Sunflowers",
   passage:
     "Mia planted three sunflower seeds in a small pot by the classroom window. Each morning she checked the soil, added a little water, and turned the pot so every side could reach the sun. After two weeks, tiny green shoots appeared. Mia smiled because her careful routine was helping the plants grow.",
   questions: [

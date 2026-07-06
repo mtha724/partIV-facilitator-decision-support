@@ -21,9 +21,29 @@ export type StudentResponse = {
   timeOnTaskSeconds: number;
   questionResponses: QuestionResponse[];
   perceivedDifficulty: DifficultyLevel;
-  overallConfidence: ConfidenceLevel;
+  overallConfidence?: ConfidenceLevel;
+  reflectionComment?: string;
   completed: boolean;
   submittedAt: string;
+};
+
+export type ActivitySession = {
+  id: string;
+  studentName: string;
+  activityId: string;
+  startedAt: number;
+  readingStartedAt: number | null;
+  questionStartedAt: number | null;
+  readingTimeSeconds: number;
+  currentQuestionIndex: number;
+  questionResponses: Array<
+    Omit<QuestionResponse, "isCorrect" | "confidence"> & {
+      confidence: ConfidenceLevel | null;
+    }
+  >;
+  perceivedDifficulty: DifficultyLevel | null;
+  reflectionComment: string;
+  completed: boolean;
 };
 
 export type SupportIndicator = {
