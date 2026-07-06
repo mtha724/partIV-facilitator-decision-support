@@ -4,6 +4,7 @@ import type { ActivityResult } from "@/shared/types/activity";
 
 const storageKey = "partiv.activityResults";
 const listeners = new Set<() => void>();
+const emptyServerResults: ActivityResult[] = [];
 let cachedRawResults: string | null = null;
 let cachedResults: ActivityResult[] = [];
 
@@ -37,7 +38,7 @@ export function getActivityResultsSnapshot(): ActivityResult[] {
 }
 
 export function getServerActivityResultsSnapshot(): ActivityResult[] {
-  return [];
+  return emptyServerResults;
 }
 
 export function subscribeActivityResults(listener: () => void) {

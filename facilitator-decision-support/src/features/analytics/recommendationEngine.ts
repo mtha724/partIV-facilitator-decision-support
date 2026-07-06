@@ -1,5 +1,6 @@
 import type {
   FacilitatorRecommendation,
+  QuestionResponse,
   StudentResponse,
   SupportIndicator,
 } from "@/shared/types/activity";
@@ -14,66 +15,122 @@ const secondsToLabel = (seconds: number) => {
   return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
 };
 
+const average = (values: number[]) => {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  return values.reduce((total, value) => total + value, 0) / values.length;
+};
+
+function getQuestionResponses(response: StudentResponse): QuestionResponse[] {
+  return Array.isArray(response.questionResponses) ? response.questionResponses : [];
+}
+
 export function generateRecommendation(
   response: StudentResponse,
 ): FacilitatorRecommendation {
   const indicators: SupportIndicator[] = [];
+  const questionResponses = getQuestionResponses(response);
+  const correctCount = questionResponses.filter((question) => question.isCorrect).length;
+  const accuracy =
+    questionResponses.length === 0 ? 0 : correctCount / questionResponses.length;
+  const totalHints = questionResponses.reduce(
+    (total, question) => total + question.hintCount,
+    0,
+  );
+  const totalAnswerChanges = questionResponses.reduce(
+    (total, question) => total + question.answerChangeCount,
+    0,
+  );
+  const totalPassageRevisits = questionResponses.reduce(
+    (total, question) => total + question.passageRevisitCount,
+    0,
+  );
+  const averageFirstInteractionSeconds = average(
+    questionResponses
+      .map((question) => question.firstInteractionSeconds)
+      .filter((value): value is number => value !== null),
+  );
+  const averageQuestionTimeSeconds = average(
+    questionResponses.map((question) => question.questionTimeSeconds),
+  );
+  const lowConfidenceCount = questionResponses.filter(
+    (question) => question.confidence <= 2,
+  ).length;
 
-  if (!response.isCorrect) {
+  const possibleTaskUnderstandingConcern =
+    averageFirstInteractionSeconds >= 20 ||
+    totalAnswerChanges >= 2 ||
+    totalPassageRevisits >= 2 ||
+    averageQuestionTimeSeconds >= 75;
+
+  const possibleContentConcern =
+    accuracy < 0.75 || (accuracy < 1 && totalHints > 0);
+  const possibleSelfEfficacyConcern =
+    lowConfidenceCount > 0 ||
+    response.overallConfidence <= 2 ||
+    response.perceivedDifficulty >= 3;
+
+  if (possibleTaskUnderstandingConcern) {
+    indicators.push({
+      id: "task-processing",
+      label: "Possible task-understanding concern",
+      severity: accuracy >= 0.75 ? "medium" : "high",
+      evidence: `First answer delay averaged ${secondsToLabel(
+        Math.round(averageFirstInteractionSeconds),
+      )}; passage revisits: ${totalPassageRevisits}; answer changes: ${totalAnswerChanges}.`,
+    });
+  }
+
+  if (accuracy < 1) {
     indicators.push({
       id: "accuracy",
-      label: "Incorrect response",
-      severity: "high",
-      evidence: "The selected answer did not match the target response.",
+      label: "Accuracy concern",
+      severity: accuracy < 0.5 ? "high" : "medium",
+      evidence: `${correctCount} of ${questionResponses.length} answers were correct.`,
     });
   }
 
-  if (response.confidence <= 2) {
-    indicators.push({
-      id: "low-confidence",
-      label: "Low confidence",
-      severity: response.isCorrect ? "medium" : "high",
-      evidence: `Confidence rating was ${response.confidence} out of 5.`,
-    });
-  }
-
-  if (response.hintCount > 0) {
+  if (totalHints > 0) {
     indicators.push({
       id: "hint-use",
-      label: "Hint requested",
-      severity: response.hintCount > 1 ? "medium" : "low",
-      evidence: `The student used ${response.hintCount} hint${
-        response.hintCount === 1 ? "" : "s"
+      label: "Hint used",
+      severity: totalHints > 1 ? "medium" : "low",
+      evidence: `The student opened ${totalHints} hint${
+        totalHints === 1 ? "" : "s"
       }.`,
     });
   }
 
-  if (response.rereadCount >= 2) {
+  if (lowConfidenceCount > 0) {
     indicators.push({
-      id: "rereading",
-      label: "Repeated rereading",
+      id: "low-question-confidence",
+      label: "Low answer confidence",
       severity: "medium",
-      evidence: `The passage was reread ${response.rereadCount} times.`,
+      evidence: `${lowConfidenceCount} answer${
+        lowConfidenceCount === 1 ? "" : "s"
+      } had confidence marked as not sure or guessing.`,
     });
   }
 
-  if (response.attemptCount > 1) {
+  if (response.perceivedDifficulty >= 3) {
     indicators.push({
-      id: "multiple-attempts",
-      label: "Answer changed",
+      id: "high-difficulty",
+      label: "Learner found activity challenging",
       severity: "medium",
-      evidence: `The student changed their answer ${response.attemptCount - 1} time${
-        response.attemptCount === 2 ? "" : "s"
-      } before submitting.`,
+      evidence: "The learner reflection marked the activity as challenging.",
     });
   }
 
-  if (response.timeOnTaskSeconds > 180) {
+  if (response.timeOnTaskSeconds > 240) {
     indicators.push({
       id: "extended-time",
       label: "Extended time on task",
       severity: "medium",
-      evidence: `Time on task was ${secondsToLabel(response.timeOnTaskSeconds)}.`,
+      evidence: `Total activity time was ${secondsToLabel(
+        response.timeOnTaskSeconds,
+      )}.`,
     });
   }
 
@@ -82,12 +139,9 @@ export function generateRecommendation(
       id: "secure-progress",
       label: "Secure progress",
       severity: "low",
-      evidence: "The response was correct with no additional support signals.",
+      evidence: "The student completed the activity accurately with no major support signals.",
     });
   }
-
-  const highConcern = indicators.some((indicator) => indicator.severity === "high");
-  const needsCheckIn = highConcern || indicators.length >= 3;
 
   return {
     id: crypto.randomUUID(),
@@ -95,15 +149,19 @@ export function generateRecommendation(
     activityId: response.activityId,
     createdAt: response.submittedAt,
     indicators,
-    summary: needsCheckIn
-      ? "Prioritise a short facilitator check-in."
-      : response.isCorrect
-        ? "Student appears ready to continue."
-        : "Review the main idea strategy before the next task.",
-    action: needsCheckIn
-      ? "Ask the student to explain how they chose their answer, then model identifying repeated details that point to the main idea."
-      : response.isCorrect
-        ? "Give brief positive feedback and offer the next literacy task."
-        : "Prompt the student to reread the passage and identify the detail that appears across the whole text.",
+    summary: possibleTaskUnderstandingConcern
+      ? "Review how the student interpreted the task before reteaching content."
+      : possibleContentConcern
+        ? "Student may need content strategy support."
+        : possibleSelfEfficacyConcern
+          ? "Student may benefit from confidence-building feedback."
+          : "Student appears ready to continue.",
+    action: possibleTaskUnderstandingConcern
+      ? "Ask the student to explain what the question was asking and how they decided where to look in the passage."
+      : possibleContentConcern
+        ? "Model using details from the passage to justify the main idea."
+        : possibleSelfEfficacyConcern
+          ? "Give specific feedback on what the student did successfully, then offer a similar follow-up item."
+          : "Offer the next reading activity.",
   };
 }

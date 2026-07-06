@@ -1,16 +1,28 @@
-export type ConfidenceLevel = 1 | 2 | 3 | 4 | 5;
+export type ConfidenceLevel = 1 | 2 | 3 | 4;
+export type DifficultyLevel = 1 | 2 | 3;
+
+export type QuestionResponse = {
+  questionId: string;
+  selectedAnswer: string;
+  isCorrect: boolean;
+  confidence: ConfidenceLevel;
+  hintCount: number;
+  answerChangeCount: number;
+  firstInteractionSeconds: number | null;
+  questionTimeSeconds: number;
+  passageRevisitCount: number;
+};
 
 export type StudentResponse = {
   id: string;
   studentName: string;
   activityId: string;
-  selectedAnswer: string;
-  isCorrect: boolean;
-  confidence: ConfidenceLevel;
-  hintCount: number;
-  rereadCount: number;
-  attemptCount: number;
+  readingTimeSeconds: number;
   timeOnTaskSeconds: number;
+  questionResponses: QuestionResponse[];
+  perceivedDifficulty: DifficultyLevel;
+  overallConfidence: ConfidenceLevel;
+  completed: boolean;
   submittedAt: string;
 };
 
